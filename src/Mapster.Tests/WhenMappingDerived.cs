@@ -1,17 +1,18 @@
-﻿using NUnit.Framework;
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Shouldly;
 
 namespace Mapster.Tests
 {
-    [TestFixture]
+    [TestClass]
     public class WhenMappingDerived
     {
-        [TearDown]
-        public void TearDown()
+        [TestCleanup]
+        public void TestCleanup()
         {
             TypeAdapterConfig.GlobalSettings.Clear();
         }
 
-        [Test]
+        [TestMethod]
         public void WhenCompilingConfigDerivedWithoutMembers()
         {
             //Arrange
@@ -21,10 +22,10 @@ namespace Mapster.Tests
                                                            ;
 
             //Act && Assert
-            Assert.DoesNotThrow(() => config.Compile());
+            Should.NotThrow(() => config.Compile());
         }
 
-        [Test]
+        [TestMethod]
         public void WhenMappingDerivedWithoutMembers()
         {
             //Arrange
@@ -43,7 +44,7 @@ namespace Mapster.Tests
             Assert.AreEqual(inputEntity.Id, result.Id);
         }
 
-        private class BaseDto
+        internal class BaseDto
         {
             public long Id { get; set; }
 
@@ -53,12 +54,12 @@ namespace Mapster.Tests
             }
         }
 
-        private class Entity
+        internal class Entity
         {
             public long Id { get; set; }
         }
 
-        private class DerivedDto : BaseDto
+        internal class DerivedDto : BaseDto
         {
             public DerivedDto(long id) : base(id) { }
         }

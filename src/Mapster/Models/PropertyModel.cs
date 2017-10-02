@@ -5,7 +5,7 @@ using System.Reflection;
 
 namespace Mapster.Models
 {
-    internal class PropertyModel : IMemberModel
+    public class PropertyModel : IMemberModelEx
     {
         private readonly PropertyInfo _propertyInfo;
         public PropertyModel(PropertyInfo propertyInfo)
@@ -14,7 +14,7 @@ namespace Mapster.Models
         }
 
         public Type Type => _propertyInfo.PropertyType;
-        public string Name => _propertyInfo.Name;
+        public virtual string Name => _propertyInfo.Name;
         public object Info => _propertyInfo;
 
         public AccessModifier SetterModifier
@@ -22,24 +22,25 @@ namespace Mapster.Models
             get
             {
                 var setter = _propertyInfo.GetSetMethod();
-                if (setter == null)
-                    return AccessModifier.None;
-
-                if (setter.IsFamilyOrAssembly)
-                    return AccessModifier.Protected | AccessModifier.Internal;
-                if (setter.IsFamily)
-                    return AccessModifier.Protected;
-                if (setter.IsAssembly)
-                    return AccessModifier.Internal;
-                if (setter.IsPublic)
-                    return AccessModifier.Public;
-                return AccessModifier.Private;
+                return setter?.GetAccessModifier() ?? AccessModifier.None;
+            }
+        }
+        public AccessModifier AccessModifier
+        {
+            get
+            {
+                var getter = _propertyInfo.GetGetMethod();
+                return getter?.GetAccessModifier() ?? AccessModifier.None;
             }
         }
 
-        public Expression GetExpression(Expression source)
+        public virtual Expression GetExpression(Expression source)
         {
             return Expression.Property(source, _propertyInfo);
+        }
+        public Expression SetExpression(Expression source, Expression value)
+        {
+            return Expression.Assign(GetExpression(source), value);
         }
         public IEnumerable<object> GetCustomAttributes(bool inherit)
         {

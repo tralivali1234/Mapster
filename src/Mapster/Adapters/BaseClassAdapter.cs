@@ -8,13 +8,13 @@ namespace Mapster.Adapters
 {
     internal abstract class BaseClassAdapter : BaseAdapter
     {
-        protected abstract ClassModel GetClassModel(Type destinationType);
+        protected abstract ClassModel GetClassModel(Type destinationType, CompileArgument arg);
 
         #region Build the Adapter Model
 
         protected ClassMapping CreateClassConverter(Expression source, Expression destination, CompileArgument arg)
         {
-            var classModel = GetClassModel(arg.DestinationType);
+            var classModel = GetClassModel(arg.DestinationType, arg);
             var destinationMembers = classModel.Members;
 
             var unmappedDestinationMembers = new List<string>();
@@ -23,11 +23,14 @@ namespace Mapster.Adapters
 
             foreach (var destinationMember in destinationMembers)
             {
-                LambdaExpression setterCondition;
-                if (ProcessIgnores(arg.Settings, destinationMember, source, out setterCondition)) continue;
+                if (ProcessIgnores(arg.Settings, destinationMember, out var setterCondition))
+                    continue;
 
                 var member = destinationMember;
-                var getter = arg.Settings.ValueAccessingStrategies
+                var resolvers = arg.Settings.ValueAccessingStrategies.AsEnumerable();
+                if (arg.Settings.IgnoreNonMapped == true)
+                    resolvers = resolvers.Where(ValueAccessingStrategy.CustomResolvers.Contains);
+                var getter = resolvers
                     .Select(fn => fn(source, member, arg))
                     .FirstOrDefault(result => result != null);
 
@@ -36,8 +39,7 @@ namespace Mapster.Adapters
                     var propertyModel = new MemberMapping
                     {
                         Getter = getter,
-                        Setter = destinationMember.GetExpression(destination),
-                        SetterInfo = destinationMember.Info,
+                        DestinationMember = destinationMember,
                         SetterCondition = setterCondition,
                     };
                     properties.Add(propertyModel);
@@ -47,8 +49,7 @@ namespace Mapster.Adapters
                     var propertyModel = new MemberMapping
                     {
                         Getter = null,
-                        Setter = destinationMember.GetExpression(destination),
-                        SetterInfo = destinationMember.Info,
+                        DestinationMember = destinationMember,
                         SetterCondition = setterCondition,
                     };
                     properties.Add(propertyModel);
@@ -71,18 +72,17 @@ namespace Mapster.Adapters
             };
         }
 
-        private static bool ProcessIgnores(
+        protected static bool ProcessIgnores(
             TypeAdapterSettings config,
             IMemberModel destinationMember,
-            Expression source,
             out LambdaExpression condition)
         {
-            if (config.IgnoreMembers.TryGetValue(destinationMember.Name, out condition)) {
-                return condition == null;
-            }
+            condition = null;
+            if (!destinationMember.ShouldMapMember(config.ShouldMapMember, MemberSide.Destination))
+                return true;
 
-            var attributes = destinationMember.GetCustomAttributes(true).Select(attr => attr.GetType());
-            return config.IgnoreAttributes.Overlaps(attributes);
+            return config.IgnoreIfs.TryGetValue(destinationMember.Name, out condition)
+                   && condition == null;
         }
 
         #endregion

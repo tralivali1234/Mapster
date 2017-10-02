@@ -10,53 +10,50 @@ namespace Mapster.Adapters
 {
     internal class RecordTypeAdapter : BaseClassAdapter
     {
-        protected override int Score => -151;
+        protected override int Score => -149;
 
-        protected override bool CanMap(Type sourceType, Type destinationType, MapType mapType)
+        protected override bool CanMap(PreCompileArgument arg)
         {
-            if (sourceType == typeof (string) || sourceType == typeof (object))
-                return false;
-
-            if (!destinationType.IsRecordType())
+            if (!arg.DestinationType.IsRecordType())
                 return false;
 
             return true;
         }
 
-        protected override Expression CreateInstantiationExpression(Expression source, CompileArgument arg)
+        protected override Expression CreateInstantiationExpression(Expression source, Expression destination, CompileArgument arg)
         {
             //new TDestination(src.Prop1, src.Prop2)
 
             if (arg.Settings.ConstructUsingFactory != null)
-                return base.CreateInstantiationExpression(source, arg);
+                return base.CreateInstantiationExpression(source, destination, arg);
 
             var classConverter = CreateClassConverter(source, null, arg);
-            var properties = classConverter.Members;
+            var members = classConverter.Members;
 
             var arguments = new List<Expression>();
-            foreach (var property in properties)
+            foreach (var member in members)
             {
-                var parameterInfo = (ParameterInfo) property.SetterInfo;
+                var parameterInfo = (ParameterInfo) member.DestinationMember.Info;
                 var defaultValue = parameterInfo.IsOptional ? parameterInfo.DefaultValue : parameterInfo.ParameterType.GetDefault();
-                var defaultConst = Expression.Constant(defaultValue, property.Setter.Type);
+                var defaultConst = Expression.Constant(defaultValue, member.DestinationMember.Type);
 
                 Expression getter;
-                if (property.Getter == null)
+                if (member.Getter == null)
                 {
                     getter = defaultConst;
                 }
                 else
                 {
-                    getter = CreateAdaptExpression(property.Getter, property.Setter.Type, arg);
+                    getter = CreateAdaptExpression(member.Getter, member.DestinationMember.Type, arg);
 
-                    if (arg.Settings.IgnoreNullValues == true && (!property.Getter.Type.GetTypeInfo().IsValueType || property.Getter.Type.IsNullable()))
+                    if (arg.Settings.IgnoreNullValues == true && (!member.Getter.Type.GetTypeInfo().IsValueType || member.Getter.Type.IsNullable()))
                     {
-                        var condition = Expression.NotEqual(property.Getter, Expression.Constant(null, property.Getter.Type));
+                        var condition = Expression.NotEqual(member.Getter, Expression.Constant(null, member.Getter.Type));
                         getter = Expression.Condition(condition, getter, defaultConst);
                     }
-                    if (property.SetterCondition != null)
+                    if (member.SetterCondition != null)
                     {
-                        var condition = Expression.Not(property.SetterCondition.Apply(source, Expression.Constant(arg.DestinationType.GetDefault(), arg.DestinationType)));
+                        var condition = Expression.Not(member.SetterCondition.Apply(source, Expression.Constant(arg.DestinationType.GetDefault(), arg.DestinationType)));
                         getter = Expression.Condition(condition, getter, defaultConst);
                     }
                 }
@@ -76,19 +73,14 @@ namespace Mapster.Adapters
             return CreateInstantiationExpression(source, arg);
         }
 
-        protected override ClassModel GetClassModel(Type destinationType)
+        protected override ClassModel GetClassModel(Type destinationType, CompileArgument arg)
         {
-            var props = destinationType.GetFieldsAndProperties();
-            var names = props.Select(p => p.Name.ToPascalCase()).ToHashSet();
-            return (from ctor in destinationType.GetConstructors()
-                    let ps = ctor.GetParameters()
-                    where ps.Length > 0 && names.IsSupersetOf(ps.Select(p => p.Name.ToPascalCase()))
-                    orderby ps.Length descending
-                    select new ClassModel
-                    {
-                        ConstructorInfo = ctor,
-                        Members = ps.Select(ReflectionUtils.CreateModel)
-                    }).First();
+            var ctor = destinationType.GetConstructors()[0];
+            return new ClassModel
+            {
+                ConstructorInfo = ctor,
+                Members = ctor.GetParameters().Select(ReflectionUtils.CreateModel)
+            };
         }
 
     }

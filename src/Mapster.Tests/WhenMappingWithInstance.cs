@@ -1,29 +1,29 @@
 ﻿using System;
 using System.Collections.Generic;
-using NUnit.Framework;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Shouldly;
 
 namespace Mapster.Tests
 {
-    [TestFixture]
+    [TestClass]
     public class WhenMappingWithInstance
     {
 
-        [Test]
+        [TestMethod]
         public void Mapping_Basic_Poco_Succeeds()
         {
             TypeAdapterConfig<SimplePoco, SimpleDto>.NewConfig()
                 .Compile();
 
             IAdapter instance = TypeAdapter.GetInstance();
-            var source = new SimplePoco {Id = new Guid(), Name = "Test"};
+            var source = new SimplePoco {Id = new Guid(), Name = "TestMethod"};
 
             var destination = instance.Adapt<SimpleDto>(source);
 
             destination.Name.ShouldBe(source.Name);
         }
 
-        [Test]
+        [TestMethod]
         public void False_Condition_Primitive_Does_Not_Map()
         {
             TypeAdapterConfig<SimplePoco, SimpleDto>.NewConfig()
@@ -39,7 +39,7 @@ namespace Mapster.Tests
             dto.Name.ShouldBeNull();
         }
 
-        [Test]
+        [TestMethod]
         public void Passed_Condition_Primitive_Does_Map()
         {
 
@@ -67,7 +67,7 @@ namespace Mapster.Tests
         public class SimpleDto
         {
             public Guid Id { get; set; }
-            public string Name { get; protected set; }
+            public string Name { get; internal set; }
         }
 
         public class ChildPoco
@@ -95,7 +95,7 @@ namespace Mapster.Tests
             public Guid Id { get; set; }
             public string Name { get; set; }
 
-            public IReadOnlyList<ChildDto> Children { get; protected set; }
+            public IReadOnlyList<ChildDto> Children { get; internal set; }
         }
 
         #endregion
